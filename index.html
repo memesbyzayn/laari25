@@ -1278,27 +1278,44 @@ for (let i = 0; i < CANDLES; i++) {
 let micStream, micCtx, micRaf;
 $('micBtn').onclick = async () => {
   if (micStream) return stopMic();
+  // create + resume the audio context inside the tap (required on iPhone/Android)
+  micCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try { await micCtx.resume(); } catch(e) {}
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({audio:true});
-    micCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const an = micCtx.createAnalyser(); an.fftSize = 512;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no mic api');
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    if (micCtx.state !== 'running') { try { await micCtx.resume(); } catch(e) {} }
+    const an = micCtx.createAnalyser(); an.fftSize = 1024;
     micCtx.createMediaStreamSource(micStream).connect(an);
-    const data = new Uint8Array(an.fftSize); let last = 0;
+    const data = new Uint8Array(an.fftSize); let last = 0, hits = 0;
+    // calibrate to the room's background noise for half a second
+    let base = 0, n = 0; const t0 = Date.now();
     $('micBtn').textContent = '🌬️ Blow now…';
     (function listen(){
       an.getByteTimeDomainData(data);
-      let sum = 0; for (const v of data) { const x = (v - 128) / 128; sum += x * x; }
+      let sum = 0; for (let i = 0; i < data.length; i++) { const x = (data[i] - 128) / 128; sum += x * x; }
       const rms = Math.sqrt(sum / data.length);
-      if (rms > .18 && Date.now() - last > 250) { const lit = candleEls.find(c => !c.classList.contains('out')); if (lit) blow(lit); last = Date.now(); }
+      if (Date.now() - t0 < 500) { base += rms; n++; }
+      else {
+        const thr = Math.max(0.045, (base / Math.max(n,1)) * 3);
+        hits = rms > thr ? hits + 1 : 0;
+        if (hits >= 2 && Date.now() - last > 280) {
+          const lit = candleEls.find(c => !c.classList.contains('out')); if (lit) blow(lit); last = Date.now(); hits = 0;
+        }
+      }
       micRaf = requestAnimationFrame(listen);
     })();
-  } catch (e) { $('micBtn').textContent = 'Mic not available — tap the candles'; micStream = null; }
+  } catch (e) {
+    stopMic();
+    $('micBtn').textContent = 'Mic blocked here — tap the candles instead 🕯️';
+    $('wish').textContent = /Instagram|FBAN|FBAV|WhatsApp/i.test(navigator.userAgent) ? 'Tip: open the link in Chrome/Safari to use the mic' : '';
+  }
 };
 function stopMic(){
   cancelAnimationFrame(micRaf);
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   if (micCtx) micCtx.close().catch(()=>{});
-  micStream = null; micCtx = null; $('micBtn').textContent = '🎤 Blow with mic';
+  micStream = null; micCtx = null; $('micBtn').textContent = outCount < CANDLES ? '🎤 Blow with mic' : '🎂 All candles out!';
 }
 
 /* ---------- counter ---------- */
