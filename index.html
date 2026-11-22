@@ -365,7 +365,7 @@ const CONFIG = {
   fromName: "Ostrich 🪶",                 // how you sign off
 
   // 🔒 COUNTDOWN — the site stays locked until her birthday
-  birthday: "2026-11-23T00:00:00",        // her birthday (YYYY-MM-DDTHH:MM:SS)
+  birthday: "2026-11-23T00:30:00",        // her birthday (YYYY-MM-DDTHH:MM:SS)
   age: 25,                                // the age she is turning
   useCountdown: true,                     // false = no lock
 
@@ -1225,7 +1225,7 @@ $('releaseBtn').onclick = () => {
     releaseLantern(rand(innerWidth*.1, innerWidth*.9), innerHeight + 20, rand(14, 34), '', rand(9, 14)), i * 220);
   if (text) {
     const ws = store.get('wishes') || []; ws.push(text); store.set('wishes', ws); renderWishes();
-    if (C.whatsapp) { $('wishWa').href = 'https://wa.me/' + C.whatsapp + '?text=' + encodeURIComponent('🏮 My birthday wish: ' + text); $('wishWa').style.display = 'inline-block'; }
+    if (C.whatsapp) { $('wishWa').href = 'https://wa.me/' + C.whatsapp + '?text=' + encodeURIComponent('My birthday wish (sent by lantern): ' + text); $('wishWa').style.display = 'inline-block'; }
   }
   $('wishText').value = ''; releasedCount++;
   $('released').textContent = releasedCount === 1 ? 'Your wish is floating up to the stars ✨' : releasedCount + ' wishes in the sky ✨';
@@ -1423,7 +1423,7 @@ C.coupons.forEach((c, i) => {
     el.classList.add('used'); b.textContent = 'Redeemed ✓';
     used.push(i); store.set('usedCoupons', used);
     const r = el.getBoundingClientRect(); burst(r.left + r.width/2, r.top + r.height/2, 80);
-    if (C.whatsapp) window.open(`https://wa.me/${C.whatsapp}?text=${encodeURIComponent('I\'m redeeming my coupon: ' + c.title + ' ' + c.icon)}`, '_blank');
+    if (C.whatsapp) window.open(`https://wa.me/${C.whatsapp}?text=${encodeURIComponent('Hey Ostrich, I\'m redeeming my coupon: ' + c.title + ' :)')}`, '_blank');
   };
   $('coupons').appendChild(el);
 });
