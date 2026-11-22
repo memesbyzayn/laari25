@@ -601,6 +601,8 @@ P.S. I saved one more thing for you, just below 👇`,
       <button class="btn" id="releaseBtn">🏮 Release my lantern</button>
     </div>
     <div class="released" id="released"></div>
+    <a class="btn ghost" id="wishWa" target="_blank" rel="noopener" style="display:none;margin-top:14px;text-decoration:none">💌 Send this wish to Ostrich too</a>
+    <div id="wishList" style="margin-top:18px;color:var(--muted);font-family:'Dancing Script',cursive;font-size:1.25rem;line-height:1.6"></div>
     <div class="max reveal" id="maxLantern"><div class="lan" style="--w:30px"></div><div class="max-note script" id="maxNote"></div></div>
   </section>
 
@@ -742,20 +744,13 @@ P.S. I saved one more thing for you, just below 👇`,
     <div class="ow-grid" id="owGrid"></div>
   </section>
 
-  <!-- MEDIA -->
-  <section id="mediaSec">
-    <div class="eyebrow reveal">press play</div>
-    <h2 class="reveal">A message <em>from me</em></h2>
-    <div class="media reveal" id="media"></div>
-  </section>
-
   <!-- LETTER -->
   <section>
     <div class="eyebrow reveal">one last thing</div>
     <h2 class="reveal">A letter <em>for you</em></h2>
-    <p class="sub reveal">Press play first, then open the envelope 🎵</p>
+    <p class="sub reveal">Turn on our song, then open the envelope 🎵</p>
     <button class="btn ghost reveal" id="songBtn" style="margin-top:18px"></button>
-    <div id="songBox" style="width:min(560px,100%);margin-top:18px"></div>
+    <div id="songBox" style="position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden" aria-hidden="true"></div>
     <div class="envelope reveal" id="envelope">
       <div class="env-body"></div><div class="env-front"></div>
       <div class="env-flap"></div><div class="seal">♥</div>
@@ -1227,6 +1222,10 @@ $('releaseBtn').onclick = () => {
   releaseLantern(r.left + r.width/2, r.top - 60, 64, text, 10);
   for (let i = 0; i < 9; i++) setTimeout(() =>
     releaseLantern(rand(innerWidth*.1, innerWidth*.9), innerHeight + 20, rand(14, 34), '', rand(9, 14)), i * 220);
+  if (text) {
+    const ws = store.get('wishes') || []; ws.push(text); store.set('wishes', ws); renderWishes();
+    if (C.whatsapp) { $('wishWa').href = 'https://wa.me/' + C.whatsapp + '?text=' + encodeURIComponent('🏮 My birthday wish: ' + text); $('wishWa').style.display = 'inline-block'; }
+  }
   $('wishText').value = ''; releasedCount++;
   $('released').textContent = releasedCount === 1 ? 'Your wish is floating up to the stars ✨' : releasedCount + ' wishes in the sky ✨';
 };
@@ -1251,6 +1250,15 @@ else {
     g.appendChild(c);
   }
 }
+
+function renderWishes(){
+  const ws = store.get('wishes') || []; const box = $('wishList'); box.innerHTML = '';
+  if (!ws.length) return;
+  const h = document.createElement('div'); h.textContent = 'your wishes in the sky:'; h.style.cssText = "font-family:'DM Sans';font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)";
+  box.appendChild(h);
+  ws.slice(-6).forEach(w => { const d = document.createElement('div'); d.textContent = '🏮 ' + w; box.appendChild(d); });
+}
+renderWishes();
 
 /* ---------- cake ---------- */
 const CANDLES = 5; let outCount = 0; const candleEls = [];
@@ -1456,42 +1464,20 @@ C.openWhen.forEach(o => {
 $('modalClose').onclick = () => $('modal').classList.add('hidden');
 $('modal').onclick = e => { if (e.target === $('modal')) $('modal').classList.add('hidden'); };
 
-/* ---------- media ---------- */
-(function(){
-  const box = $('media');
-  if (!C.video && !C.voice) {
-    if (preview) box.innerHTML = '<div class="placeholder">🎥 Your video or 🎙️ voice note shows up here.<br>Add <b>video</b> or <b>voice</b> in CONFIG. (She won\'t see this box if you leave them empty.)</div>';
-    else $('mediaSec').style.display = 'none';
-    return;
-  }
-  if (C.video) {
-    const yt = C.video.match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/);
-    if (yt) { const f = document.createElement('iframe'); f.src = 'https://www.youtube.com/embed/' + yt[1]; f.allow = 'autoplay; encrypted-media'; f.allowFullscreen = true; box.appendChild(f); }
-    else { const v = document.createElement('video'); v.src = C.video; v.controls = true; v.playsInline = true; box.appendChild(v); }
-  }
-  if (C.voice) {
-    const w = document.createElement('div'); w.className = 'voice';
-    w.innerHTML = '<div class="script" style="font-size:1.5rem;color:var(--gold)">🎙️ press play, it\'s me</div>';
-    const a = document.createElement('audio'); a.src = C.voice; a.controls = true;
-    a.onplay = () => { if (audio && !audio.paused) audio.pause(); };
-    w.appendChild(a); box.appendChild(w);
-  }
-})();
-
-/* ---------- our song ---------- */
+/* ---------- our song (plays hidden in the background) ---------- */
+let songOn = false;
 if (C.song && C.song.title) {
-  $('songBtn').textContent = '🎵 Play our song: ' + C.song.title;
+  const label = () => $('songBtn').textContent = songOn ? '⏸ Pause our song' : '🎵 Play our song: ' + C.song.title;
+  label();
   $('songBtn').onclick = () => {
     const id = (C.song.youtube || '').match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
-    if (id) {
-      $('songBox').innerHTML = '';
-      const f = document.createElement('iframe');
-      f.src = 'https://www.youtube.com/embed/' + id[1] + '?autoplay=1';
-      f.allow = 'autoplay; encrypted-media'; f.allowFullscreen = true;
-      f.style.cssText = 'width:100%;aspect-ratio:16/9;border:0;border-radius:16px';
-      $('songBox').appendChild(f); $('songBtn').style.display = 'none';
-      if (audio && !audio.paused) audio.pause();
-    } else window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent('Taylor Swift ' + C.song.title + ' official'), '_blank');
+    if (!id) return window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent('Taylor Swift ' + C.song.title + ' official'), '_blank');
+    if (songOn) { $('songBox').innerHTML = ''; songOn = false; return label(); }
+    const f = document.createElement('iframe');
+    f.src = 'https://www.youtube.com/embed/' + id[1] + '?autoplay=1&loop=1&playlist=' + id[1] + '&controls=0&playsinline=1';
+    f.allow = 'autoplay; encrypted-media'; f.width = 1; f.height = 1;
+    $('songBox').appendChild(f); songOn = true; label();
+    if (audio && !audio.paused) audio.pause();
   };
 } else $('songBtn').style.display = 'none';
 
