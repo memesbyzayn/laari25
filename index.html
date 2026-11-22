@@ -321,7 +321,7 @@
   @keyframes pawfade{0%{opacity:0;transform:scale(.4)}20%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:translateY(-30px)}}
 
   /* floating controls */
-  #music{position:fixed;bottom:20px;right:20px;z-index:30;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);
+  #music{position:fixed;bottom:20px;right:20px;z-index:85;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);
     background:var(--bg2);color:var(--accent);font-size:1.2rem;cursor:pointer;display:none}
   #picker{position:fixed;bottom:20px;left:20px;z-index:80;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:10px}
   #pickToggle{width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(10,10,25,.8);font-size:1.3rem;cursor:pointer;backdrop-filter:blur(8px)}
@@ -749,8 +749,6 @@ P.S. I saved one more thing for you, just below 👇`,
   <section>
     <div class="eyebrow reveal">one last thing</div>
     <h2 class="reveal">A letter <em>for you</em></h2>
-    <p class="sub reveal">Turn on our song, then open the envelope 🎵</p>
-    <button class="btn ghost reveal" id="songBtn" style="margin-top:18px"></button>
     <div id="songBox" style="position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden" aria-hidden="true"></div>
     <div class="envelope reveal" id="envelope">
       <div class="env-body"></div><div class="env-front"></div>
@@ -1145,7 +1143,7 @@ function loop(){
 /* ---------- music ---------- */
 const audio = C.music ? new Audio(C.music) : null;
 if (audio) { audio.loop = true; $('music').style.display = 'block'; }
-$('music').onclick = () => { if (audio) audio.paused ? audio.play() : audio.pause(); };
+
 
 /* ---------- entry flow: countdown → password → gift ---------- */
 const show = id => $(id).classList.remove('hidden');
@@ -1171,13 +1169,14 @@ function afterLock(){
 }
 function checkPw(){
   const norm = v => String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (norm($('pwInput').value) === norm(C.password)) { hide('pass'); show('gate'); }
+  if (norm($('pwInput').value) === norm(C.password)) { startSong(); hide('pass'); show('gate'); }
   else { $('pwMsg').textContent = 'Not quite… try again ♥'; $('pwForm').classList.remove('shake'); void $('pwForm').offsetWidth; $('pwForm').classList.add('shake'); }
 }
 $('pwBtn').onclick = checkPw;
 $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); checkPw(); } });
 $('pwForm').addEventListener('submit', e => { e.preventDefault(); checkPw(); });
 $('gift').onclick = () => {
+  startSong();
   $('gift').classList.add('open');
   const r = $('gift').getBoundingClientRect();
   burst(r.left + r.width/2, r.top + 40, 220);
@@ -1465,22 +1464,23 @@ C.openWhen.forEach(o => {
 $('modalClose').onclick = () => $('modal').classList.add('hidden');
 $('modal').onclick = e => { if (e.target === $('modal')) $('modal').classList.add('hidden'); };
 
-/* ---------- our song (plays hidden in the background) ---------- */
-let songOn = false;
-if (C.song && C.song.title) {
-  const label = () => $('songBtn').textContent = songOn ? '⏸ Pause our song' : '🎵 Play our song: ' + C.song.title;
-  label();
-  $('songBtn').onclick = () => {
-    const id = (C.song.youtube || '').match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
-    if (!id) return window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent('Taylor Swift ' + C.song.title + ' official'), '_blank');
-    if (songOn) { $('songBox').innerHTML = ''; songOn = false; return label(); }
-    const f = document.createElement('iframe');
-    f.src = 'https://www.youtube.com/embed/' + id[1] + '?autoplay=1&loop=1&playlist=' + id[1] + '&controls=0&playsinline=1';
-    f.allow = 'autoplay; encrypted-media'; f.width = 1; f.height = 1;
-    $('songBox').appendChild(f); songOn = true; label();
-    if (audio && !audio.paused) audio.pause();
-  };
-} else $('songBtn').style.display = 'none';
+/* ---------- our song: starts after the password, hidden player, mute in the corner ---------- */
+let songFrame = null, songMuted = false;
+const songId = ((C.song && C.song.youtube) || '').match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
+function ytCmd(func){ if (songFrame) songFrame.contentWindow.postMessage(JSON.stringify({event:'command', func, args:[]}), '*'); }
+function startSong(){
+  if (!songId || songFrame) return;
+  songFrame = document.createElement('iframe');
+  songFrame.src = 'https://www.youtube.com/embed/' + songId[1] + '?autoplay=1&loop=1&playlist=' + songId[1] + '&controls=0&playsinline=1&enablejsapi=1';
+  songFrame.allow = 'autoplay; encrypted-media'; songFrame.width = 1; songFrame.height = 1;
+  $('songBox').appendChild(songFrame);
+  $('music').style.display = 'block'; $('music').textContent = '🔊';
+}
+$('music').onclick = () => {
+  if (!songFrame) { startSong(); return; }
+  songMuted = !songMuted; ytCmd(songMuted ? 'mute' : 'unMute'); if (!songMuted) ytCmd('playVideo');
+  $('music').textContent = songMuted ? '🔇' : '🔊';
+};
 
 /* ---------- letter ---------- */
 let opened = false;
