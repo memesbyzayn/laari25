@@ -534,8 +534,6 @@ P.S. I saved one more thing for you, just below 👇`,
 
   music: "",      // optional: "song.mp3" next to index.html
   psLink: { text: "🎬 One more thing… tap me", url: "https://www.instagram.com/reel/DgDbtuuT7My/" },
-  // 🎵 OUR SONG — plays from Taylor Swift's official YouTube upload (no file needed)
-  song: { title: "Love Story (Taylor's Version)", youtube: "https://www.youtube.com/watch?v=uW5TFOFcLJM" },   // paste the official YouTube link here
 };
 </script>
 
@@ -1290,6 +1288,7 @@ $('micBtn').onclick = async () => {
     const data = new Uint8Array(an.fftSize); let last = 0, hits = 0;
     // calibrate to the room's background noise for half a second
     let base = 0, n = 0; const t0 = Date.now();
+    Lullaby.duck(true);
     $('micBtn').textContent = '🌬️ Blow now…';
     (function listen(){
       an.getByteTimeDomainData(data);
@@ -1312,6 +1311,7 @@ $('micBtn').onclick = async () => {
   }
 };
 function stopMic(){
+  Lullaby.duck(false);
   cancelAnimationFrame(micRaf);
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   if (micCtx) micCtx.close().catch(()=>{});
@@ -1481,23 +1481,53 @@ C.openWhen.forEach(o => {
 $('modalClose').onclick = () => $('modal').classList.add('hidden');
 $('modal').onclick = e => { if (e.target === $('modal')) $('modal').classList.add('hidden'); };
 
-/* ---------- our song: starts after the password, hidden player, mute in the corner ---------- */
-let songFrame = null, songMuted = false;
-const songId = ((C.song && C.song.youtube) || '').match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
-function ytCmd(func){ if (songFrame) songFrame.contentWindow.postMessage(JSON.stringify({event:'command', func, args:[]}), '*'); }
-function startSong(){
-  if (!songId || songFrame) return;
-  songFrame = document.createElement('iframe');
-  songFrame.src = 'https://www.youtube.com/embed/' + songId[1] + '?autoplay=1&loop=1&playlist=' + songId[1] + '&controls=0&playsinline=1&enablejsapi=1';
-  songFrame.allow = 'autoplay; encrypted-media'; songFrame.width = 1; songFrame.height = 1;
-  $('songBox').appendChild(songFrame);
-  $('music').style.display = 'block'; $('music').textContent = '🔊';
-}
-$('music').onclick = () => {
-  if (!songFrame) { startSong(); return; }
-  songMuted = !songMuted; ytCmd(songMuted ? 'mute' : 'unMute'); if (!songMuted) ytCmd('playVideo');
-  $('music').textContent = songMuted ? '🔇' : '🔊';
-};
+/* ---------- "Lantern Lullaby": original music-box waltz, starts after the password ---------- */
+const Lullaby = (() => {
+  const BEAT = 60 / 84, N = n => 440 * Math.pow(2, (n - 69) / 12);
+  const M = {G4:67,A4:69,B4:71,C5:72,D5:74,E5:76,F5:77,G5:79,A5:81,B5:83,C6:84,D6:86,E6:88};
+  const melody = [
+    [['E5',1],['G5',1],['C6',1]], [['B5',2],['G5',1]], [['A5',1],['G5',1],['E5',1]], [['D5',3]],
+    [['E5',1],['G5',1],['A5',1]], [['G5',2],['E5',1]], [['F5',1],['E5',1],['D5',1]], [['C5',3]],
+    [['A4',1],['C5',1],['E5',1]], [['G5',2],['F5',1]], [['E5',1],['D5',1],['C5',1]], [['D5',2],['G4',1]],
+    [['E5',1],['G5',1],['C6',1]], [['D6',2],['B5',1]], [['C6',1],['G5',1],['E5',1]], [['C5',3]]];
+  const chords = [[48,55,60],[43,50,55],[45,52,57],[43,50,55],[48,55,60],[40,47,52],[41,48,53],[48,55,60],
+                  [45,52,57],[40,47,52],[41,48,53],[43,50,55],[48,55,60],[43,50,55],[48,55,60],[48,55,60]];
+  let ac, master, verb, timer, bar = 0, next = 0, muted = false;
+  function reverb(){ const len = ac.sampleRate * 2.4, b = ac.createBuffer(2, len, ac.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 3); }
+    const cv = ac.createConvolver(); cv.buffer = b; return cv; }
+  function chime(f, t, vol, dur){ [[1, vol], [3.01, vol*.18], [5.4, vol*.05]].forEach(([m, v]) => {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.value = f * m;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + dur * (m > 1 ? .35 : 1));
+    o.connect(g); g.connect(master); g.connect(verb); o.start(t); o.stop(t + dur + .05); }); }
+  function pad(f, t, dur, vol){ const o = ac.createOscillator(), g = ac.createGain(), fl = ac.createBiquadFilter();
+    o.type = 'triangle'; o.frequency.value = f; fl.type = 'lowpass'; fl.frequency.value = 900;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .08); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(fl); fl.connect(g); g.connect(master); g.connect(verb); o.start(t); o.stop(t + dur + .05); }
+  function scheduleBar(b, t){ let bt = t;
+    melody[b].forEach(([n, beats]) => { chime(N(M[n]), bt, .16, 1.6 + beats * .4); bt += beats * BEAT; });
+    const ch = chords[b]; pad(N(ch[0]), t, BEAT * 2.6, .07);
+    chime(N(ch[1] + 12), t + BEAT, .045, 1); chime(N(ch[2] + 12), t + BEAT * 2, .045, 1);
+    if (b % 4 === 3) chime(N(M.E6 + (b === 15 ? -4 : 0)), t + BEAT * 2.5, .03, 2.2); }
+  function tick(){ while (next < ac.currentTime + .6) { scheduleBar(bar, next); next += BEAT * 3; bar = (bar + 1) % 16; } }
+  return {
+    start(){
+      if (ac) return;
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = 0; master.connect(ac.destination);
+      verb = reverb(); const vg = ac.createGain(); vg.gain.value = .35; verb.connect(vg); vg.connect(master);
+      ac.resume().catch(()=>{});
+      master.gain.setTargetAtTime(.75, ac.currentTime, .8);           // gentle fade-in
+      next = ac.currentTime + .15; tick(); timer = setInterval(tick, 150);
+      document.addEventListener('visibilitychange', () => { if (!ac) return; document.hidden ? ac.suspend() : (!muted && ac.resume()); });
+    },
+    toggle(){ if (!ac) { this.start(); return false; }
+      muted = !muted; master.gain.setTargetAtTime(muted ? 0 : .75, ac.currentTime, .15); if (!muted) ac.resume(); return muted; },
+    duck(on){ if (ac && !muted) master.gain.setTargetAtTime(on ? .15 : .75, ac.currentTime, .3); },
+  };
+})();
+function startSong(){ Lullaby.start(); $('music').style.display = 'block'; $('music').textContent = '🔊'; }
+$('music').onclick = () => { const m = Lullaby.toggle(); $('music').style.display = 'block'; $('music').textContent = m ? '🔇' : '🔊'; };
 
 /* ---------- letter ---------- */
 let opened = false;
