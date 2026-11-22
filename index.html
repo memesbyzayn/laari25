@@ -544,7 +544,7 @@ P.S. I saved one more thing for you, just below 👇`,
 <button id="music" aria-label="Toggle music">♪</button>
 
 <!-- COUNTDOWN LOCK -->
-<div class="screen hidden" id="lock">
+<div class="screen" id="lock">
   <div class="small">something special unlocks in</div>
   <div class="cd-row">
     <div class="unit"><b id="ld">0</b><span>days</span></div>
@@ -1166,7 +1166,7 @@ function startFlow(){
       if (d <= 0) { clearInterval(lockTimer); hide('lock'); afterLock(); }
     };
     upd(); lockTimer = setInterval(upd, 1000);
-  } else afterLock();
+  } else { hide('lock'); afterLock(); }
 }
 $('skipLock').onclick = () => { clearInterval(lockTimer); hide('lock'); afterLock(); };
 function afterLock(){
