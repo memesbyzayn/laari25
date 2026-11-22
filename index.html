@@ -365,7 +365,7 @@ const CONFIG = {
   fromName: "Ostrich 🪶",                 // how you sign off
 
   // 🔒 COUNTDOWN — the site stays locked until her birthday
-  birthday: "2026-11-23T00:30:00",        // her birthday (YYYY-MM-DDTHH:MM:SS)
+  birthday: "2026-11-23T01:30:00",        // her birthday (YYYY-MM-DDTHH:MM:SS)
   age: 25,                                // the age she is turning
   useCountdown: true,                     // false = no lock
 
@@ -533,6 +533,8 @@ Make a big wish tonight, Laari. I'll spend this whole year helping it come true.
 P.S. I saved one more thing for you, just below 👇`,
 
   music: "",      // optional: "song.mp3" next to index.html
+  // 🎵 OUR SONG — Love Story from the official YouTube link (plays hidden after the password)
+  song: { title: "Love Story (Taylor's Version)", youtube: "https://www.youtube.com/watch?v=uW5TFOFcLJM" },
   psLink: { text: "🎬 One more thing… tap me", url: "https://www.instagram.com/reel/DgDbtuuT7My/" },
 };
 </script>
@@ -1288,7 +1290,7 @@ $('micBtn').onclick = async () => {
     const data = new Uint8Array(an.fftSize); let last = 0, hits = 0;
     // calibrate to the room's background noise for half a second
     let base = 0, n = 0; const t0 = Date.now();
-    Lullaby.duck(true);
+    if (songFrame && !songMuted) songFrame.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[15]}),'*');
     $('micBtn').textContent = '🌬️ Blow now…';
     (function listen(){
       an.getByteTimeDomainData(data);
@@ -1311,7 +1313,7 @@ $('micBtn').onclick = async () => {
   }
 };
 function stopMic(){
-  Lullaby.duck(false);
+  if (songFrame) songFrame.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[100]}),'*');
   cancelAnimationFrame(micRaf);
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   if (micCtx) micCtx.close().catch(()=>{});
@@ -1526,8 +1528,23 @@ const Lullaby = (() => {
     duck(on){ if (ac && !muted) master.gain.setTargetAtTime(on ? .15 : .75, ac.currentTime, .3); },
   };
 })();
-function startSong(){ Lullaby.start(); $('music').style.display = 'block'; $('music').textContent = '🔊'; }
-$('music').onclick = () => { const m = Lullaby.toggle(); $('music').style.display = 'block'; $('music').textContent = m ? '🔇' : '🔊'; };
+/* Love Story from the official YouTube link, hidden, starts after the password */
+let songFrame = null, songMuted = false;
+const songId = ((C.song && C.song.youtube) || '').match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
+function ytCmd(func){ if (songFrame) songFrame.contentWindow.postMessage(JSON.stringify({event:'command', func, args:[]}), '*'); }
+function startSong(){
+  if (!songId || songFrame) return;
+  songFrame = document.createElement('iframe');
+  songFrame.src = 'https://www.youtube.com/embed/' + songId[1] + '?autoplay=1&loop=1&playlist=' + songId[1] + '&controls=0&playsinline=1&enablejsapi=1';
+  songFrame.allow = 'autoplay; encrypted-media'; songFrame.width = 1; songFrame.height = 1;
+  $('songBox').appendChild(songFrame);
+  $('music').style.display = 'block'; $('music').textContent = '🔊';
+}
+$('music').onclick = () => {
+  if (!songFrame) { startSong(); return; }
+  songMuted = !songMuted; ytCmd(songMuted ? 'mute' : 'unMute'); if (!songMuted) ytCmd('playVideo');
+  $('music').textContent = songMuted ? '🔇' : '🔊';
+};
 
 /* ---------- letter ---------- */
 let opened = false;
