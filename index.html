@@ -561,8 +561,8 @@ P.S. I saved one more thing for you, just below 👇`,
   <div class="small">only one person can open this</div>
   <h1 class="screen-title script">Enter the secret word</h1>
   <form class="pw" id="pwForm">
-    <input id="pwInput" type="text" autocomplete="off" placeholder="type it here…" />
-    <button class="btn" type="submit">Open</button>
+    <input id="pwInput" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="type it here…" />
+    <button class="btn" type="button" id="pwBtn">Open</button>
   </form>
   <div class="small" id="pwHint"></div>
   <div class="pw-msg" id="pwMsg"></div>
@@ -1173,12 +1173,14 @@ function afterLock(){
   if (C.password) { show('pass'); $('pwHint').textContent = C.passwordHint ? 'hint: ' + C.passwordHint : ''; $('pwInput').focus(); }
   else show('gate');
 }
-$('pwForm').onsubmit = e => {
-  e.preventDefault();
+function checkPw(){
   const norm = v => String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
   if (norm($('pwInput').value) === norm(C.password)) { hide('pass'); show('gate'); }
   else { $('pwMsg').textContent = 'Not quite… try again ♥'; $('pwForm').classList.remove('shake'); void $('pwForm').offsetWidth; $('pwForm').classList.add('shake'); }
-};
+}
+$('pwBtn').onclick = checkPw;
+$('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); checkPw(); } });
+$('pwForm').addEventListener('submit', e => { e.preventDefault(); checkPw(); });
 $('gift').onclick = () => {
   $('gift').classList.add('open');
   const r = $('gift').getBoundingClientRect();
